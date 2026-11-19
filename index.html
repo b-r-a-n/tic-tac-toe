@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tic-Tac-Toe vs AI</title>
+<style>
+  :root {
+    --bg: #f6f7fb; --panel: #ffffff; --text: #1c1f2a; --muted: #6b7180;
+    --line: #d9dce5; --x: #e4572e; --o: #2a7de1; --win: #ffe08a; --btn: #1c1f2a; --btn-text: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12141a; --panel: #1c1f28; --text: #eceef3; --muted: #9aa0ad;
+      --line: #333847; --x: #ff7a59; --o: #5aa2ff; --win: #5a4b16; --btn: #eceef3; --btn-text: #12141a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 16px;
+  }
+  main { width: 100%; max-width: 420px; text-align: center; }
+  h1 { margin: 0 0 4px; font-size: 1.8rem; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+  select, button {
+    font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  button.primary { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
+  #status { min-height: 1.6em; font-size: 1.15rem; font-weight: 600; margin-bottom: 14px; }
+  #board {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    background: var(--line); padding: 8px; border-radius: 14px; aspect-ratio: 1;
+  }
+  .cell {
+    background: var(--panel); border: none; border-radius: 10px; font-size: clamp(2.5rem, 14vw, 4.5rem);
+    font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0;
+    transition: background .15s;
+  }
+  .cell:not(:disabled):hover { background: color-mix(in srgb, var(--panel) 85%, var(--text)); }
+  .cell:disabled { cursor: default; }
+  .cell.X { color: var(--x); } .cell.O { color: var(--o); }
+  .cell.win { background: var(--win); }
+  .score { display: flex; justify-content: space-around; margin-top: 18px; color: var(--muted); }
+  .score b { display: block; font-size: 1.5rem; color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tic-Tac-Toe</h1>
+  <p class="sub">You are <span style="color:var(--x);font-weight:700">X</span>. The AI is <span style="color:var(--o);font-weight:700">O</span>.</p>
+  <div class="controls">
+    <label>Difficulty
+      <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard" selected>Unbeatable</option>
+      </select>
+    </label>
+    <label>First move
+      <select id="first">
+        <option value="human">You</option>
+        <option value="ai">AI</option>
+        <option value="alt" selected>Alternate</option>
+      </select>
+    </label>
+    <button class="primary" id="newGame">New game</button>
+  </div>
+  <div id="status" aria-live="polite"></div>
+  <div id="board"></div>
+  <div class="score">
+    <div>You<b id="sWins">0</b></div>
+    <div>Draws<b id="sDraws">0</b></div>
+    <div>AI<b id="sLosses">0</b></div>
+  </div>
+</main>
+<script>
+const HUMAN = "X", AI = "O";
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const boardEl = document.getElementById("board");
+const statusEl = document.getElementById("status");
+const diffEl = document.getElementById("difficulty");
+const firstEl = document.getElementById("first");
+let board, over, gameCount = 0, aiThinking = false;
+const score = { wins: 0, draws: 0, losses: 0 };
+
+const cells = Array.from({ length: 9 }, (_, i) => {
+  const b = document.createElement("button");
+  b.className = "cell";
+  b.setAttribute("aria-label", `Cell ${i + 1}`);
+  b.addEventListener("click", () => humanMove(i));
+  boardEl.appendChild(b);
+  return b;
+});
+
+function winner(b) {
+  for (const [a, c, d] of LINES)
+    if (b[a] && b[a] === b[c] && b[a] === b[d]) return { player: b[a], line: [a, c, d] };
+  return b.every(Boolean) ? { player: null, line: [] } : null;
+}
+
+function empties(b) { return b.reduce((acc, v, i) => (v ? acc : acc.concat(i)), []); }
+
+function minimax(b, player, depth) {
+  const w = winner(b);
+  if (w) return w.player === AI ? 10 - depth : w.player === HUMAN ? depth - 10 : 0;
+  const scores = empties(b).map(i => {
+    b[i] = player;
+    const s = minimax(b, player === AI ? HUMAN : AI, depth + 1);
+    b[i] = null;
+    return s;
+  });
+  return player === AI ? Math.max(...scores) : Math.min(...scores);
+}
+
+function bestMove(b) {
+  let best = -Infinity, moves = [];
+  for (const i of empties(b)) {
+    b[i] = AI;
+    const s = minimax(b, HUMAN, 1);
+    b[i] = null;
+    if (s > best) { best = s; moves = [i]; } else if (s === best) moves.push(i);
+  }
+  return moves[Math.floor(Math.random() * moves.length)];
+}
+
+function randomMove(b) { const e = empties(b); return e[Math.floor(Math.random() * e.length)]; }
+
+function chooseMove() {
+  const level = diffEl.value;
+  const mistakeRate = level === "easy" ? 0.75 : level === "medium" ? 0.3 : 0;
+  return Math.random() < mistakeRate ? randomMove(board) : bestMove(board);
+}
+
+function render() {
+  board.forEach((v, i) => {
+    cells[i].textContent = v || "";
+    cells[i].className = "cell" + (v ? " " + v : "");
+    cells[i].disabled = over || aiThinking || !!v;
+  });
+}
+
+function finish(w) {
+  over = true;
+  w.line.forEach(i => cells[i].classList.add("win"));
+  if (w.player === HUMAN) { score.wins++; statusEl.textContent = "You win! 🎉"; }
+  else if (w.player === AI) { score.losses++; statusEl.textContent = "The AI wins."; }
+  else { score.draws++; statusEl.textContent = "It's a draw."; }
+  document.getElementById("sWins").textContent = score.wins;
+  document.getElementById("sDraws").textContent = score.draws;
+  document.getElementById("sLosses").textContent = score.losses;
+}
+
+function afterMove() {
+  const w = winner(board);
+  render();
+  if (w) finish(w);
+  return !!w;
+}
+
+function aiTurn() {
+  aiThinking = true;
+  statusEl.textContent = "AI is thinking…";
+  render();
+  setTimeout(() => {
+    board[chooseMove()] = AI;
+    aiThinking = false;
+    if (!afterMove()) statusEl.textContent = "Your turn";
+  }, 350);
+}
+
+function humanMove(i) {
+  if (over || aiThinking || board[i]) return;
+  board[i] = HUMAN;
+  if (!afterMove()) aiTurn();
+}
+
+function newGame() {
+  board = Array(9).fill(null);
+  over = false; aiThinking = false;
+  const f = firstEl.value;
+  const aiFirst = f === "ai" || (f === "alt" && gameCount % 2 === 1);
+  gameCount++;
+  render();
+  if (aiFirst) aiTurn(); else statusEl.textContent = "Your turn";
+}
+
+document.getElementById("newGame").addEventListener("click", newGame);
+newGame();
+</script>
+</body>
+</html>
