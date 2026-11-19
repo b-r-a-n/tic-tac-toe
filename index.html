@@ -147,11 +147,33 @@ function finish(w) {
   over = true;
   w.line.forEach(i => cells[i].classList.add("win"));
   if (w.player === HUMAN) { score.wins++; statusEl.textContent = "You win! 🎉"; }
-  else if (w.player === AI) { score.losses++; statusEl.textContent = "The AI wins."; }
+  else if (w.player === AI) { score.losses++; statusEl.textContent = "AI: " + taunt(); }
   else { score.draws++; statusEl.textContent = "It's a draw."; }
   document.getElementById("sWins").textContent = score.wins;
   document.getElementById("sDraws").textContent = score.draws;
   document.getElementById("sLosses").textContent = score.losses;
+}
+
+const TAUNTS = [
+  "Three in a row. You can count to three, right?",
+  "I've seen a random number generator play better than that.",
+  "Was that a strategy, or were you just clicking around?",
+  "Don't feel bad. Actually, go ahead and feel a little bad.",
+  "GG. Well, G for me anyway.",
+  "I'd let you win, but I don't know how to be that bad.",
+  "You could try Easy mode. I won't tell anyone.",
+  "Nine squares, and you still found the wrong ones.",
+  "Beep boop. That's robot for 'too easy.'",
+  "Maybe tic-tac-toe just isn't your game. Have you tried checkers?",
+  "I'm a few hundred lines of JavaScript, and I'm still winning.",
+  "Want me to explain the rules again?",
+];
+let lastTaunt = -1;
+function taunt() {
+  let i;
+  do { i = Math.floor(Math.random() * TAUNTS.length); } while (i === lastTaunt);
+  lastTaunt = i;
+  return TAUNTS[i];
 }
 
 function afterMove() {
